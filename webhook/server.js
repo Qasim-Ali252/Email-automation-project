@@ -49,7 +49,7 @@ app.post('/webhook', (req, res) => {
   // Log email details
   console.log('📋 Email Details:');
   console.log('  Subject:', email.subject || 'N/A');
-  console.log('  From:', email.from || 'N/A');
+  console.log('  From:', email.from_email || email.from || 'N/A');
   console.log('  Date:', email.date || 'N/A');
   console.log('  Message ID:', email.messageId || 'N/A');
   console.log('  Has attachments:', email.hasAttachments || false);
@@ -100,19 +100,24 @@ async function processEmail(email) {
     ];
     
     const isSystemEmail = systemEmails.some(pattern => 
-      email.from && email.from.toLowerCase().includes(pattern)
+      (email.from_email || email.from) && (email.from_email || email.from).toLowerCase().includes(pattern)
     );
     
     if (isSystemEmail) {
       console.log('🤖 System email detected - skipping processing');
-      console.log('📧 From:', email.from);
+      console.log('📧 From:', email.from_email || email.from);
       logToFile(email, 'SYSTEM_SKIPPED');
       return;
     }
     
     // Validate required fields
-    if (!email.from || !email.subject) {
-      console.error('❌ Missing required fields:', { from: email.from, subject: email.subject });
+    const fromField = email.from_email || email.from; // Handle both field names
+    if (!fromField || !email.subject) {
+      console.error('❌ Missing required fields:', { 
+        from_email: email.from_email, 
+        from: email.from, 
+        subject: email.subject 
+      });
       return;
     }
     
@@ -132,7 +137,7 @@ async function processEmail(email) {
 
     // Prepare data for your Vercel webhook (convert Apps Script format to your format)
     const webhookData = {
-      from_email: extractEmail(email.from),
+      from_email: extractEmail(fromField),
       subject: email.subject,
       body: email.body || email.snippet || 'No body content available'
     };
@@ -183,7 +188,8 @@ async function processEmail(email) {
 function logToFile(email, status, errorDetails = null) {
   try {
     const timestamp = new Date().toISOString();
-    const logEntry = `${timestamp} | ${status} | ${email.from || 'N/A'} | ${email.subject || 'N/A'}${errorDetails ? ' | ' + errorDetails : ''}\n`;
+    const fromField = email.from_email || email.from || 'N/A';
+    const logEntry = `${timestamp} | ${status} | ${fromField} | ${email.subject || 'N/A'}${errorDetails ? ' | ' + errorDetails : ''}\n`;
     
     fs.appendFileSync('emails.log', logEntry);
     console.log('📝 Logged to emails.log');

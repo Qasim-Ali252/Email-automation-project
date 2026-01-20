@@ -14,14 +14,15 @@ class AIAnalysisService {
     this.client = new OpenAI({
       apiKey: config.openai.apiKey,
       baseURL: 'https://api.groq.com/openai/v1', // Groq API endpoint
-      timeout: 10000 // Very aggressive 10-second timeout for Vercel
+      timeout: config.openai.timeout // Use config timeout
     });
     
     this.model = config.openai.model;
     
     console.log(`🤖 AI Analysis Service initialized`);
     console.log(`   Model: ${this.model}`);
-    console.log(`   Timeout: 10 seconds (aggressive for Vercel)`);
+    console.log(`   Timeout: ${config.openai.timeout}ms (aggressive for Vercel)`);
+    console.log(`   API Key: ${config.openai.apiKey ? 'Present' : 'Missing'}`);
     console.log(`   Mode: STRICT (no fallbacks)`);
   }
 
@@ -143,13 +144,15 @@ Respond ONLY with valid JSON in this exact format:
    * @returns {Promise<Object>} Analysis results
    */
   async analyzeEmail(email_id, subject, body) {
-    console.log(`Analyzing email ${email_id}... (STRICT MODE - no fallbacks)`);
+    console.log(`🤖 Starting AI analysis for email ${email_id}...`);
+    console.log(`📋 Subject: ${subject}`);
+    console.log(`📄 Body length: ${body.length} characters`);
     
     try {
       // Build prompt
       const prompt = this.buildPrompt(subject, body);
 
-      console.log(`📤 Calling Groq API for email ${email_id}...`);
+      console.log(`📤 Calling Groq API for email ${email_id} with model ${this.model}...`);
       const startTime = Date.now();
 
       // Call Groq API with aggressive timeout handling
@@ -170,7 +173,7 @@ Respond ONLY with valid JSON in this exact format:
           max_tokens: 300 // Reduced for faster response
         }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Groq API timeout after 8 seconds')), 8000)
+          setTimeout(() => reject(new Error(`Groq API timeout after ${config.openai.timeout}ms`)), config.openai.timeout)
         )
       ]);
 
@@ -184,7 +187,7 @@ Respond ONLY with valid JSON in this exact format:
         throw new Error('Empty response from Groq API - this should not happen');
       }
 
-      console.log('AI Response:', responseText);
+      console.log(`📝 AI Response for ${email_id}:`, responseText);
 
       // Parse and validate response
       const analysis = this.parseResponse(responseText);

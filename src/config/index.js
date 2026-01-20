@@ -23,9 +23,9 @@ function validateConfig() {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
 
-  // Check for AI API key (either OpenAI or Groq)
-  if (!process.env.OPENAI_API_KEY && !process.env.GROQ_API_KEY) {
-    throw new Error('Missing required environment variable: OPENAI_API_KEY or GROQ_API_KEY');
+  // Check for Groq API key
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('Missing required environment variable: GROQ_API_KEY');
   }
 }
 
@@ -42,11 +42,11 @@ const config = {
     serviceKey: process.env.SUPABASE_SERVICE_KEY
   },
 
-  // OpenAI (or Groq API compatible)
+  // Groq API Configuration
   openai: {
-    apiKey: process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY,
-    model: process.env.OPENAI_MODEL || 'llama-3.1-8b-instant', // Faster model for Vercel
-    timeout: parseInt(process.env.OPENAI_TIMEOUT) || 30000
+    apiKey: process.env.GROQ_API_KEY, // Use Groq API key directly
+    model: process.env.OPENAI_MODEL || 'llama-3.1-8b-instant', // Fast model for Vercel
+    timeout: parseInt(process.env.OPENAI_TIMEOUT) || 8000 // Aggressive timeout for Vercel
   },
 
   // SMTP
