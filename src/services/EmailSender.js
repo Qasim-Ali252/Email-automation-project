@@ -143,6 +143,9 @@ Phone: <a href="tel:+17877102725">+1 (787) 710-2725</a><br>
 Email: <a href="mailto:info@invextech.com">info@invextech.com</a></p>`
     };
   }
+
+  /**
+   * Extract sender name from email address
    * @param {string} email - Email address
    * @returns {string} Sender name
    */
