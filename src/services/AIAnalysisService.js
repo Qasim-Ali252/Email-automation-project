@@ -14,16 +14,16 @@ class AIAnalysisService {
     this.client = new OpenAI({
       apiKey: config.openai.apiKey,
       baseURL: 'https://api.groq.com/openai/v1', // Groq API endpoint
-      timeout: config.openai.timeout // Use config timeout
+      timeout: 5000 // HARD 5 second timeout for Vercel
     });
     
     this.model = config.openai.model;
     
     console.log(`🤖 AI Analysis Service initialized`);
     console.log(`   Model: ${this.model}`);
-    console.log(`   Timeout: ${config.openai.timeout}ms (aggressive for Vercel)`);
+    console.log(`   Timeout: 5000ms HARD LIMIT (Vercel safe)`);
     console.log(`   API Key: ${config.openai.apiKey ? 'Present' : 'Missing'}`);
-    console.log(`   Mode: STRICT (no fallbacks)`);
+    console.log(`   Mode: ASYNC (non-blocking)`);
   }
 
   /**
@@ -155,7 +155,7 @@ Respond ONLY with valid JSON in this exact format:
       console.log(`📤 Calling Groq API for email ${email_id} with model ${this.model}...`);
       const startTime = Date.now();
 
-      // Call Groq API with aggressive timeout handling
+      // Call Groq API with HARD timeout (never exceed 5 seconds)
       const completion = await Promise.race([
         this.client.chat.completions.create({
           model: this.model,
@@ -170,10 +170,10 @@ Respond ONLY with valid JSON in this exact format:
             }
           ],
           temperature: 0.3,
-          max_tokens: 300 // Reduced for faster response
+          max_tokens: 200 // Even smaller for faster response
         }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error(`Groq API timeout after ${config.openai.timeout}ms`)), config.openai.timeout)
+          setTimeout(() => reject(new Error(`HARD TIMEOUT: Groq API exceeded 5 seconds`)), 5000) // HARD 5 second limit
         )
       ]);
 
