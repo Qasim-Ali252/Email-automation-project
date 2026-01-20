@@ -45,7 +45,7 @@ const config = {
   // OpenAI (or Groq API compatible)
   openai: {
     apiKey: process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY,
-    model: process.env.OPENAI_MODEL || 'llama-3.3-70b-versatile',
+    model: process.env.OPENAI_MODEL || 'llama-3.1-8b-instant', // Faster model for Vercel
     timeout: parseInt(process.env.OPENAI_TIMEOUT) || 30000
   },
 

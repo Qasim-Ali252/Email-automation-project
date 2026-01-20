@@ -17,8 +17,9 @@ router.post('/test-ai', async (req, res) => {
     
     console.log('📧 Test email:', testEmail);
     
-    // Test AI analysis with a fake email ID
-    const testEmailId = 'test-strict-' + Date.now();
+    // Test AI analysis with a proper UUID
+    const { randomUUID } = await import('crypto');
+    const testEmailId = randomUUID();
     
     console.log(`🚀 Starting STRICT AI analysis for ${testEmailId}...`);
     

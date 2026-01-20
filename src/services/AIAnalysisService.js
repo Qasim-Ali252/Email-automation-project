@@ -14,14 +14,14 @@ class AIAnalysisService {
     this.client = new OpenAI({
       apiKey: config.openai.apiKey,
       baseURL: 'https://api.groq.com/openai/v1', // Groq API endpoint
-      timeout: 20000 // 20 seconds - reasonable but not infinite
+      timeout: 10000 // Very aggressive 10-second timeout for Vercel
     });
     
     this.model = config.openai.model;
     
     console.log(`🤖 AI Analysis Service initialized`);
     console.log(`   Model: ${this.model}`);
-    console.log(`   Timeout: 20 seconds`);
+    console.log(`   Timeout: 10 seconds (aggressive for Vercel)`);
     console.log(`   Mode: STRICT (no fallbacks)`);
   }
 
@@ -152,22 +152,27 @@ Respond ONLY with valid JSON in this exact format:
       console.log(`📤 Calling Groq API for email ${email_id}...`);
       const startTime = Date.now();
 
-      // Call Groq API - let it fail if it needs to
-      const completion = await this.client.chat.completions.create({
-        model: this.model,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are an expert at analyzing construction-related emails. Always respond with valid JSON only.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 500
-      });
+      // Call Groq API with aggressive timeout handling
+      const completion = await Promise.race([
+        this.client.chat.completions.create({
+          model: this.model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert at analyzing construction-related emails. Always respond with valid JSON only.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 300 // Reduced for faster response
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Groq API timeout after 8 seconds')), 8000)
+        )
+      ]);
 
       const endTime = Date.now();
       console.log(`⏱️ Groq API call completed in ${endTime - startTime}ms`);
