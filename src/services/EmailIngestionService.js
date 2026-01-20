@@ -117,13 +117,30 @@ class EmailIngestionService {
       });
 
       // Trigger AI analysis asynchronously (non-blocking)
-      // Don't await - let it run in background
+      // Don't await - let it run in background but log failures prominently
       aiAnalysisService.analyzeEmail(
         email_id,
         sanitizedData.subject,
         sanitizedData.body
       ).catch(error => {
-        console.error('Background AI analysis failed:', error.message);
+        console.error('🚨 CRITICAL: AI ANALYSIS FAILED 🚨');
+        console.error('Email ID:', email_id);
+        console.error('Error:', error.message);
+        console.error('Subject:', sanitizedData.subject);
+        console.error('From:', sanitizedData.from_email);
+        console.error('Stack:', error.stack);
+        console.error('🚨 NO AUTOMATED RESPONSE WILL BE SENT 🚨');
+        
+        // Log to audit system for monitoring
+        auditLogger.logSystemError(error, {
+          component: 'EmailIngestionService',
+          operation: 'AI_ANALYSIS_CRITICAL_FAILURE',
+          email_id: email_id,
+          from_email: sanitizedData.from_email,
+          subject: sanitizedData.subject
+        }).catch(auditError => {
+          console.error('Failed to log AI analysis failure to audit system:', auditError.message);
+        });
       });
 
       return {

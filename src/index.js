@@ -1,6 +1,7 @@
 import express from 'express';
 import { config, validateConfig } from './config/index.js';
 import emailRoutes from './routes/emailRoutes.js';
+import testRoutes from './routes/testRoutes.js';
 
 // Validate configuration on startup
 try {
@@ -29,6 +30,9 @@ app.get('/health', (req, res) => {
 
 // Email routes
 app.use('/api/emails', emailRoutes);
+
+// Test routes (for debugging)
+app.use('/api/test', testRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

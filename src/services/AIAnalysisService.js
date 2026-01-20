@@ -14,10 +14,15 @@ class AIAnalysisService {
     this.client = new OpenAI({
       apiKey: config.openai.apiKey,
       baseURL: 'https://api.groq.com/openai/v1', // Groq API endpoint
-      timeout: 15000 // Reduced timeout to 15 seconds
+      timeout: 20000 // 20 seconds - reasonable but not infinite
     });
     
     this.model = config.openai.model;
+    
+    console.log(`🤖 AI Analysis Service initialized`);
+    console.log(`   Model: ${this.model}`);
+    console.log(`   Timeout: 20 seconds`);
+    console.log(`   Mode: STRICT (no fallbacks)`);
   }
 
   /**
@@ -131,141 +136,122 @@ Respond ONLY with valid JSON in this exact format:
   }
 
   /**
-   * Analyze email using AI with retry logic
+   * Analyze email using AI - STRICT MODE (no fallbacks)
    * @param {string} email_id - Email ID
    * @param {string} subject - Email subject
    * @param {string} body - Email body
    * @returns {Promise<Object>} Analysis results
    */
   async analyzeEmail(email_id, subject, body) {
-    const maxRetries = 2;
-    let lastError;
+    console.log(`Analyzing email ${email_id}... (STRICT MODE - no fallbacks)`);
+    
+    try {
+      // Build prompt
+      const prompt = this.buildPrompt(subject, body);
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`Analyzing email ${email_id}... (attempt ${attempt}/${maxRetries})`);
+      console.log(`📤 Calling Groq API for email ${email_id}...`);
+      const startTime = Date.now();
 
-        // Build prompt
-        const prompt = this.buildPrompt(subject, body);
-
-        // Call Groq API with timeout handling
-        const completion = await Promise.race([
-          this.client.chat.completions.create({
-            model: this.model,
-            messages: [
-              {
-                role: 'system',
-                content: 'You are an expert at analyzing construction-related emails. Always respond with valid JSON only.'
-              },
-              {
-                role: 'user',
-                content: prompt
-              }
-            ],
-            temperature: 0.3, // Lower temperature for more consistent results
-            max_tokens: 500
-          }),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('API call timeout after 15 seconds')), 15000)
-          )
-        ]);
-
-        // Extract response
-        const responseText = completion.choices[0]?.message?.content;
-        
-        if (!responseText) {
-          throw new Error('Empty response from AI');
-        }
-
-        console.log('AI Response:', responseText);
-
-        // Parse and validate response
-        const analysis = this.parseResponse(responseText);
-
-        // Store analysis in database
-        await databaseService.insertAnalysis({
-          email_id,
-          email_type: analysis.email_type,
-          urgency: analysis.urgency_level,
-          confidence_score: analysis.confidence_score,
-          extracted_data: {
-            project_type: analysis.project_type,
-            location: analysis.location,
-            estimated_value: analysis.estimated_value,
-            deadline: analysis.deadline
+      // Call Groq API - let it fail if it needs to
+      const completion = await this.client.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are an expert at analyzing construction-related emails. Always respond with valid JSON only.'
           },
-          reasoning: analysis.reasoning
-        });
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 500
+      });
 
-        // Log success
-        await auditLogger.logAIAnalysisSuccess(email_id, {
-          email_type: analysis.email_type,
-          urgency: analysis.urgency_level,
-          confidence_score: analysis.confidence_score
-        });
+      const endTime = Date.now();
+      console.log(`⏱️ Groq API call completed in ${endTime - startTime}ms`);
 
-        console.log(`✅ Analysis complete for email ${email_id}: ${analysis.email_type} (confidence: ${analysis.confidence_score})`);
+      // Extract response
+      const responseText = completion.choices[0]?.message?.content;
+      
+      if (!responseText) {
+        throw new Error('Empty response from Groq API - this should not happen');
+      }
 
-        // Trigger Decision Engine (non-blocking)
-        decisionEngine.makeDecision(
+      console.log('AI Response:', responseText);
+
+      // Parse and validate response
+      const analysis = this.parseResponse(responseText);
+
+      console.log(`📊 Parsed analysis for ${email_id}:`, {
+        type: analysis.email_type,
+        urgency: analysis.urgency_level,
+        confidence: analysis.confidence_score
+      });
+
+      // Store analysis in database
+      console.log(`💾 Storing analysis in database for ${email_id}...`);
+      await databaseService.insertAnalysis({
+        email_id,
+        email_type: analysis.email_type,
+        urgency: analysis.urgency_level,
+        confidence_score: analysis.confidence_score,
+        extracted_data: {
+          project_type: analysis.project_type,
+          location: analysis.location,
+          estimated_value: analysis.estimated_value,
+          deadline: analysis.deadline
+        },
+        reasoning: analysis.reasoning
+      });
+
+      // Log success
+      await auditLogger.logAIAnalysisSuccess(email_id, {
+        email_type: analysis.email_type,
+        urgency: analysis.urgency_level,
+        confidence_score: analysis.confidence_score
+      });
+
+      console.log(`✅ Analysis complete for email ${email_id}: ${analysis.email_type} (confidence: ${analysis.confidence_score})`);
+
+      // Trigger Decision Engine - this MUST succeed
+      console.log(`🤖 Triggering decision engine for ${email_id}...`);
+      try {
+        await decisionEngine.makeDecision(
           email_id,
           analysis.email_type,
           analysis.confidence_score
-        ).catch(error => {
-          console.error('Decision engine failed:', error.message);
-        });
-
-        return {
-          success: true,
-          analysis
-        };
-
-      } catch (error) {
-        lastError = error;
-        console.error(`❌ AI analysis attempt ${attempt} failed for email ${email_id}:`, error.message);
-        
-        // If this is not the last attempt, wait before retrying
-        if (attempt < maxRetries) {
-          console.log(`⏳ Retrying in 2 seconds...`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
+        );
+        console.log(`✅ Decision engine completed for ${email_id}`);
+      } catch (decisionError) {
+        console.error(`❌ Decision engine FAILED for ${email_id}:`, decisionError.message);
+        throw new Error(`Decision engine failed: ${decisionError.message}`);
       }
-    }
 
-    // All attempts failed
-    console.error(`❌ AI analysis failed for email ${email_id} after ${maxRetries} attempts:`, lastError.message);
+      return {
+        success: true,
+        analysis
+      };
 
-    // Log failure
-    await auditLogger.logAIAnalysisFailure(email_id, lastError, {
-      subject,
-      error_type: lastError.name,
-      attempts: maxRetries
-    });
+    } catch (error) {
+      console.error(`❌ AI analysis FAILED for email ${email_id}:`, error.message);
+      console.error(`📍 Error type: ${error.constructor.name}`);
+      console.error(`📍 Stack trace:`, error.stack);
 
-    // Store failed analysis with confidence_score = 0
-    try {
-      await databaseService.insertAnalysis({
-        email_id,
-        email_type: 'Unknown/Unclear',
-        urgency: 'Medium',
-        confidence_score: 0,
-        extracted_data: {},
-        reasoning: `AI analysis failed after ${maxRetries} attempts: ${lastError.message}`
+      // Log the failure for debugging
+      await auditLogger.logAIAnalysisFailure(email_id, error, {
+        subject,
+        error_type: error.name,
+        timestamp: new Date().toISOString()
       });
-    } catch (dbError) {
-      console.error('Failed to store failed analysis:', dbError.message);
-    }
 
-    return {
-      success: false,
-      error: lastError.message,
-      analysis: {
-        email_type: 'Unknown/Unclear',
-        urgency_level: 'Medium',
-        confidence_score: 0,
-        reasoning: `AI analysis failed after ${maxRetries} attempts: ${lastError.message}`
-      }
-    };
+      // DO NOT store failed analysis - let it fail completely
+      // DO NOT trigger decision engine - let it fail completely
+      
+      // Re-throw the error to make the entire process fail
+      throw new Error(`AI Analysis failed for email ${email_id}: ${error.message}`);
+    }
   }
 
   /**
