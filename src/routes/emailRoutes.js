@@ -1,33 +1,45 @@
 import express from 'express';
 import emailIngestionService from '../services/EmailIngestionService.js';
+import aiAnalysisService from '../services/AIAnalysisService.js';
+import databaseService from '../services/DatabaseService.js';
 
 const router = express.Router();
 
 /**
  * POST /api/emails/inbound
  * Webhook endpoint for receiving incoming emails
+ * 🚀 FIXED: Respond immediately, process in background
  */
 router.post('/inbound', async (req, res) => {
+  console.log('📧 Webhook received email data');
+  
   try {
-    const result = await emailIngestionService.processIncomingEmail(req.body);
-
-    if (result.success) {
-      return res.status(200).json({
-        success: true,
-        email_id: result.email_id,
-        message: result.message
-      });
-    } else {
-      // Validation error
+    // 🔥 STEP 1: Validate payload ONLY (fast validation)
+    const validation = emailIngestionService.validatePayload(req.body);
+    if (!validation.valid) {
       return res.status(400).json({
         success: false,
-        error: result.error,
-        details: result.details
+        error: 'Validation failed',
+        details: validation.errors
       });
     }
+
+    // 🔥 STEP 2: Respond IMMEDIATELY (before any DB/AI operations)
+    res.status(200).json({
+      success: true,
+      message: 'Email received and processing started',
+      timestamp: new Date().toISOString()
+    });
+
+    // 🔥 STEP 3: Process email in background (fire & forget)
+    console.log('🚀 Starting background email processing...');
+    processEmailInBackground(req.body).catch(error => {
+      console.error('❌ Background processing failed:', error.message);
+    });
+
   } catch (error) {
-    // Unexpected error
-    console.error('Unexpected error in email webhook:', error);
+    // Only validation errors should reach here
+    console.error('❌ Webhook validation error:', error.message);
     return res.status(500).json({
       success: false,
       error: 'Internal server error'
@@ -84,6 +96,48 @@ async function processGmailChange(messageData) {
   // 3. Call your existing email ingestion service
   
   console.log('✅ Gmail change processed');
+}
+
+/**
+ * 🚀 Background Email Processing Function
+ * This runs AFTER the webhook has already responded
+ * No timeout limits - can take as long as needed
+ */
+async function processEmailInBackground(payload) {
+  console.log('🔄 Background processing started');
+  
+  try {
+    // Step 1: Sanitize and store email in database
+    console.log('💾 Storing email in database...');
+    const sanitizedData = {
+      from_email: emailIngestionService.sanitizeInput(payload.from_email),
+      subject: emailIngestionService.sanitizeInput(payload.subject),
+      body: emailIngestionService.sanitizeInput(payload.body)
+    };
+
+    const email_id = await databaseService.insertEmail(sanitizedData);
+    console.log(`✅ Email stored with ID: ${email_id}`);
+
+    // Step 2: Run AI analysis (with timeout protection)
+    console.log('🤖 Starting AI analysis...');
+    console.log('ABOUT TO CALL GROQ'); // Debug log as suggested
+    
+    await aiAnalysisService.analyzeEmail(
+      email_id,
+      sanitizedData.subject,
+      sanitizedData.body
+    );
+    
+    console.log('GROQ FINISHED'); // Debug log as suggested
+    console.log('✅ Background processing completed successfully');
+
+  } catch (error) {
+    console.error('❌ Background processing failed:', error.message);
+    console.error('📍 Stack trace:', error.stack);
+    
+    // Don't throw - this is fire & forget
+    // The webhook has already responded successfully
+  }
 }
 
 export default router;

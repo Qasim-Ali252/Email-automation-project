@@ -155,7 +155,7 @@ Respond ONLY with valid JSON in this exact format:
       console.log(`📤 Calling Groq API for email ${email_id} with model ${this.model}...`);
       const startTime = Date.now();
 
-      // Call Groq API with HARD timeout (never exceed 5 seconds)
+      // Call Groq API with aggressive timeout handling
       const completion = await Promise.race([
         this.client.chat.completions.create({
           model: this.model,
@@ -170,15 +170,24 @@ Respond ONLY with valid JSON in this exact format:
             }
           ],
           temperature: 0.3,
-          max_tokens: 200 // Even smaller for faster response
+          max_tokens: 300 // Reduced for faster response
         }),
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error(`HARD TIMEOUT: Groq API exceeded 5 seconds`)), 5000) // HARD 5 second limit
+          setTimeout(() => reject(new Error(`Groq API timeout after ${config.openai.timeout}ms`)), config.openai.timeout)
         )
       ]);
 
       const endTime = Date.now();
       console.log(`⏱️ Groq API call completed in ${endTime - startTime}ms`);
+
+      } catch (apiError) {
+        clearTimeout(timeoutId); // Clear timeout on error
+        
+        if (apiError.name === 'AbortError') {
+          throw new Error(`Groq API aborted after ${config.openai.timeout}ms timeout`);
+        }
+        throw apiError; // Re-throw other API errors
+      }
 
       // Extract response
       const responseText = completion.choices[0]?.message?.content;
