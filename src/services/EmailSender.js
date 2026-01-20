@@ -107,7 +107,42 @@ Email: <a href="mailto:info@invextech.com">info@invextech.com</a></p>`
   }
 
   /**
-   * Extract sender name from email address
+   * Get email template for generic acknowledgment (fallback)
+   * @param {string} originalSubject - Original email subject
+   * @param {string} senderName - Sender name (extracted from email)
+   * @returns {Object} Email template
+   */
+  getGenericTemplate(originalSubject, senderName = 'there') {
+    return {
+      subject: `Re: ${originalSubject}`,
+      text: `Dear ${senderName},
+
+Thank you for contacting InvexTech. We have received your message and our team will review it promptly.
+
+We aim to respond to all inquiries within 24 hours. If your matter is urgent, please feel free to contact us directly at +1 (787) 710-2725.
+
+Best regards,
+
+InvexTech
+30 N Gould St, Ste N
+Sheridan, WY 82801, United States
+Phone: +1 (787) 710-2725
+Email: info@invextech.com`,
+      html: `<p>Dear ${senderName},</p>
+
+<p>Thank you for contacting <strong>InvexTech</strong>. We have received your message and our team will review it promptly.</p>
+
+<p>We aim to respond to all inquiries within <strong>24 hours</strong>. If your matter is urgent, please feel free to contact us directly at <a href="tel:+17877102725">+1 (787) 710-2725</a>.</p>
+
+<p>Best regards,</p>
+
+<p><strong>InvexTech</strong><br>
+30 N Gould St, Ste N<br>
+Sheridan, WY 82801, United States<br>
+Phone: <a href="tel:+17877102725">+1 (787) 710-2725</a><br>
+Email: <a href="mailto:info@invextech.com">info@invextech.com</a></p>`
+    };
+  }
    * @param {string} email - Email address
    * @returns {string} Sender name
    */
@@ -244,6 +279,37 @@ Email: <a href="mailto:info@invextech.com">info@invextech.com</a></p>`
 
     } catch (error) {
       console.error('Failed to send invoice acknowledgment:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Send generic acknowledgment email (fallback)
+   * @param {string} email_id - Email ID
+   * @param {string} recipientEmail - Recipient email address
+   * @param {string} originalSubject - Original email subject
+   * @returns {Promise<Object>} Send result
+   */
+  async sendGenericAcknowledgment(email_id, recipientEmail, originalSubject) {
+    try {
+      const senderName = this.extractSenderName(recipientEmail);
+      const template = this.getGenericTemplate(originalSubject, senderName);
+
+      const result = await this.sendWithRetry(
+        recipientEmail,
+        template.subject,
+        template.text,
+        template.html,
+        email_id
+      );
+
+      return result;
+
+    } catch (error) {
+      console.error('Failed to send generic acknowledgment:', error.message);
       return {
         success: false,
         error: error.message

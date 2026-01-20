@@ -237,15 +237,44 @@ class WorkflowExecutor {
     const actions = [];
 
     try {
-      actions.push('Email type unclear - flagged for manual review');
-      actions.push('NO automated email sent');
-      actions.push(`AI reasoning: ${analysis.reasoning}`);
+      // Check if this is a fallback case (AI failed)
+      if (decision.status === 'Generic Response' && decision.automation_allowed) {
+        // Send generic acknowledgment
+        const sendResult = await emailSender.sendGenericAcknowledgment(
+          email.id,
+          email.from_email,
+          email.subject
+        );
 
-      return {
-        success: true,
-        email_sent: false,
-        actions_taken: actions
-      };
+        if (sendResult.success) {
+          actions.push(`Sent generic acknowledgment email to ${email.from_email}`);
+          actions.push('AI analysis failed - used fallback response');
+          return {
+            success: true,
+            email_sent: true,
+            actions_taken: actions
+          };
+        } else {
+          actions.push(`Failed to send generic email: ${sendResult.error}`);
+          return {
+            success: false,
+            email_sent: false,
+            actions_taken: actions,
+            error: sendResult.error
+          };
+        }
+      } else {
+        // Normal unknown workflow - no email sent
+        actions.push('Email type unclear - flagged for manual review');
+        actions.push('NO automated email sent');
+        actions.push(`AI reasoning: ${analysis.reasoning}`);
+
+        return {
+          success: true,
+          email_sent: false,
+          actions_taken: actions
+        };
+      }
 
     } catch (error) {
       actions.push(`Error: ${error.message}`);

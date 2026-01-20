@@ -117,24 +117,25 @@ class EmailIngestionService {
       });
 
       // Trigger AI analysis asynchronously (non-blocking)
-      // Don't await - let it run in background but log failures prominently
+      // Don't await - let it run in background but provide fallback
       aiAnalysisService.analyzeEmail(
         email_id,
         sanitizedData.subject,
         sanitizedData.body
       ).catch(error => {
-        console.error('🚨 CRITICAL: AI ANALYSIS FAILED 🚨');
+        console.error('🚨 AI ANALYSIS FAILED - USING FALLBACK 🚨');
         console.error('Email ID:', email_id);
         console.error('Error:', error.message);
         console.error('Subject:', sanitizedData.subject);
         console.error('From:', sanitizedData.from_email);
-        console.error('Stack:', error.stack);
-        console.error('🚨 NO AUTOMATED RESPONSE WILL BE SENT 🚨');
+        
+        // The AI service already triggered fallback workflow
+        console.log('✅ Fallback workflow should have been triggered');
         
         // Log to audit system for monitoring
         auditLogger.logSystemError(error, {
           component: 'EmailIngestionService',
-          operation: 'AI_ANALYSIS_CRITICAL_FAILURE',
+          operation: 'AI_ANALYSIS_FALLBACK_TRIGGERED',
           email_id: email_id,
           from_email: sanitizedData.from_email,
           subject: sanitizedData.subject

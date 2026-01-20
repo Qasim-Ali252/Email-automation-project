@@ -244,6 +244,13 @@ Respond ONLY with valid JSON in this exact format:
       console.error(`📍 Error type: ${error.constructor.name}`);
       console.error(`📍 Stack trace:`, error.stack);
 
+      // 🚨 CRITICAL: AI ANALYSIS FAILED 🚨
+      console.error('Email ID:', email_id);
+      console.error('Error:', error.message);
+      console.error('Subject:', subject);
+      console.error('Stack:', error.stack);
+      console.error('🚨 TRIGGERING FALLBACK WORKFLOW 🚨');
+      
       // Log the failure for debugging
       await auditLogger.logAIAnalysisFailure(email_id, error, {
         subject,
@@ -251,10 +258,20 @@ Respond ONLY with valid JSON in this exact format:
         timestamp: new Date().toISOString()
       });
 
-      // DO NOT store failed analysis - let it fail completely
-      // DO NOT trigger decision engine - let it fail completely
+      // 🚀 FALLBACK: Trigger decision engine with generic classification
+      console.log('🔄 Starting fallback workflow...');
+      try {
+        await decisionEngine.makeDecision(
+          email_id,
+          'Unknown/Unclear', // Generic classification
+          0.5 // Medium confidence to trigger manual review
+        );
+        console.log('✅ Fallback workflow triggered successfully');
+      } catch (decisionError) {
+        console.error('❌ Fallback workflow also failed:', decisionError.message);
+      }
       
-      // Re-throw the error to make the entire process fail
+      // Re-throw the error to maintain strict mode behavior
       throw new Error(`AI Analysis failed for email ${email_id}: ${error.message}`);
     }
   }

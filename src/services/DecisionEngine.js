@@ -123,13 +123,21 @@ class DecisionEngine {
       };
     }
 
-    // Rule 3: Unknown/Unclear → Manual Review
+    // Rule 3: Unknown/Unclear → Send generic acknowledgment if confidence > 0.3
     if (email_type === 'Unknown/Unclear') {
-      return {
-        automation_allowed: false,
-        status: 'Manual Review',
-        reason: 'Email type could not be confidently classified'
-      };
+      if (confidence_score >= 0.3) {
+        return {
+          automation_allowed: true,
+          status: 'Generic Response',
+          reason: 'AI analysis failed - sending generic acknowledgment'
+        };
+      } else {
+        return {
+          automation_allowed: false,
+          status: 'Manual Review',
+          reason: 'Email type could not be confidently classified'
+        };
+      }
     }
 
     // Rule 4: RFQ/Bid Request with high confidence → Allow automation
