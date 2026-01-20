@@ -1,0 +1,19 @@
+{
+  "name": "gmail-webhook-server",
+  "version": "1.0.0",
+  "description": "Local webhook server for Gmail Apps Script integration",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node ../test-integration.js",
+    "debug": "node ../debug-webhook.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2"
+  },
+  "keywords": ["gmail", "webhook", "email", "automation"],
+  "author": "InvexTech",
+  "license": "MIT"
+}
