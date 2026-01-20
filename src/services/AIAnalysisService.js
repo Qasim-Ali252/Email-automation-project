@@ -155,9 +155,16 @@ Respond ONLY with valid JSON in this exact format:
       console.log(`📤 Calling Groq API for email ${email_id} with model ${this.model}...`);
       const startTime = Date.now();
 
-      // Call Groq API with aggressive timeout handling
-      const completion = await Promise.race([
-        this.client.chat.completions.create({
+      // 🔥 TIMEOUT PROTECTION: Use AbortController for better timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.log(`⏰ Aborting Groq API call after ${config.openai.timeout}ms`);
+        controller.abort();
+      }, config.openai.timeout);
+
+      try {
+        // Call Groq API with abort signal
+        const completion = await this.client.chat.completions.create({
           model: this.model,
           messages: [
             {
@@ -170,15 +177,23 @@ Respond ONLY with valid JSON in this exact format:
             }
           ],
           temperature: 0.3,
-          max_tokens: 300 // Reduced for faster response
-        }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error(`Groq API timeout after ${config.openai.timeout}ms`)), config.openai.timeout)
-        )
-      ]);
+          max_tokens: 300, // Reduced for faster response
+          signal: controller.signal // Add abort signal
+        });
 
-      const endTime = Date.now();
-      console.log(`⏱️ Groq API call completed in ${endTime - startTime}ms`);
+        clearTimeout(timeoutId); // Clear timeout if successful
+        
+        const endTime = Date.now();
+        console.log(`⏱️ Groq API call completed in ${endTime - startTime}ms`);
+
+      } catch (apiError) {
+        clearTimeout(timeoutId); // Clear timeout on error
+        
+        if (apiError.name === 'AbortError') {
+          throw new Error(`Groq API aborted after ${config.openai.timeout}ms timeout`);
+        }
+        throw apiError; // Re-throw other API errors
+      }
 
       // Extract response
       const responseText = completion.choices[0]?.message?.content;
