@@ -3,7 +3,7 @@ import OpenAI from 'openai';
 import { config } from '../config/index.js';
 import auditLogger from './AuditLogger.js';
 
-class EmailSender {
+class EmailSenderNew {
   constructor() {
     this.transporter = nodemailer.createTransport({
       host: config.smtp.host,
@@ -132,7 +132,7 @@ Email: info@invextech.com`;
 
   async sendAIResponse(email_id, recipientEmail, originalSubject, originalBody, emailType, projectDetails = {}) {
     try {
-      console.log(`📧 sendAIResponse called for email ${email_id}`);
+      console.log(`📧 NEW EmailSender - sendAIResponse called for email ${email_id}`);
       console.log(`   Recipient: ${recipientEmail}`);
       console.log(`   Subject: ${originalSubject}`);
       console.log(`   Type: ${emailType}`);
@@ -147,60 +147,9 @@ Email: info@invextech.com`;
     } catch (error) {
       console.error('Failed to send AI response:', error.message);
       return { success: false, error: error.message };
-    }
-  }
-
-  async sendAIResponse(email_id, recipientEmail, originalSubject, originalBody, emailType, projectDetails = {}) {
-    try {
-      console.log(`📧 sendAIResponse called for email ${email_id}`);
-      console.log(`   Recipient: ${recipientEmail}`);
-      console.log(`   Subject: ${originalSubject}`);
-      console.log(`   Type: ${emailType}`);
-
-      const template = await this.generateAIResponse(originalSubject, originalBody, recipientEmail, emailType, projectDetails);
-      console.log(`📧 Generated template:`, template.subject);
-
-      const result = await this.sendWithRetry(recipientEmail, template.subject, template.text, template.html, email_id);
-      console.log(`📧 Final send result:`, result);
-      return result;
-
-    } catch (error) {
-      console.error('Failed to send AI response:', error.message);
-      return { success: false, error: error.message };
-    }
-  }
-
-  async sendDynamicResponse(email_id, recipientEmail, originalSubject, originalBody, emailType, projectDetails = {}) {
-    try {
-      console.log(`📧 sendDynamicResponse called for email ${email_id}`);
-      console.log(`   Recipient: ${recipientEmail}`);
-      console.log(`   Subject: ${originalSubject}`);
-      console.log(`   Type: ${emailType}`);
-
-      const template = await this.generateAIResponse(originalSubject, originalBody, recipientEmail, emailType, projectDetails);
-      console.log(`📧 Generated template:`, template.subject);
-
-      const result = await this.sendWithRetry(recipientEmail, template.subject, template.text, template.html, email_id);
-      console.log(`📧 Final send result:`, result);
-      return result;
-
-    } catch (error) {
-      console.error('Failed to send dynamic response:', error.message);
-      return { success: false, error: error.message };
-    }
-  }
-
-  async verifyConnection() {
-    try {
-      await this.transporter.verify();
-      console.log('✅ SMTP connection verified');
-      return true;
-    } catch (error) {
-      console.error('❌ SMTP connection failed:', error.message);
-      return false;
     }
   }
 }
 
-const emailSender = new EmailSender();
-export { emailSender as default };
+const emailSenderNew = new EmailSenderNew();
+export default emailSenderNew;

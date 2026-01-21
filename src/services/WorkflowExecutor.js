@@ -1,5 +1,5 @@
 import databaseService from './DatabaseService.js';
-import emailSender from './EmailSender.js';
+import emailSender from './EmailSenderNew.js';
 import auditLogger from './AuditLogger.js';
 
 /**
@@ -95,6 +95,9 @@ class WorkflowExecutor {
     const actions = [];
 
     try {
+      console.log(`🔧 executeRFQWorkflow called for email ${email.id}`);
+      console.log(`   Decision automation_allowed: ${decision.automation_allowed}`);
+      
       // Determine priority based on deadline
       const priority = analysis.extracted_data?.deadline ? 'High' : 'Medium';
       
@@ -105,22 +108,46 @@ class WorkflowExecutor {
       // Send acknowledgment if automation allowed
       let emailSent = false;
       if (decision.automation_allowed) {
-        const sendResult = await emailSender.sendRFQAcknowledgment(
+        console.log(`🚀 Automation allowed - calling sendAIResponse (NEW)...`);
+        
+        // Check if method exists
+        if (typeof emailSender.sendAIResponse !== 'function') {
+          console.error(`❌ emailSender.sendAIResponse is not a function!`);
+          console.error(`Available methods:`, Object.getOwnPropertyNames(emailSender));
+          console.error(`Prototype methods:`, Object.getOwnPropertyNames(Object.getPrototypeOf(emailSender)));
+          actions.push('Error: sendAIResponse method not found');
+          return {
+            success: false,
+            email_sent: false,
+            actions_taken: actions,
+            error: 'sendAIResponse method not found'
+          };
+        }
+        
+        const sendResult = await emailSender.sendAIResponse(
           email.id,
           email.from_email,
           email.subject,
+          email.body,
+          analysis.email_type,
           analysis.extracted_data
         );
 
+        console.log(`📧 sendAIResponse result:`, sendResult);
+
         if (sendResult.success) {
-          actions.push(`Sent acknowledgment email to ${email.from_email}`);
+          actions.push(`Sent AI-generated acknowledgment email to ${email.from_email}`);
           emailSent = true;
         } else {
           actions.push(`Failed to send email: ${sendResult.error}`);
         }
       } else {
+        console.log(`❌ Automation blocked - no email sent`);
         actions.push('Automation blocked - no email sent');
       }
+
+      console.log(`📋 RFQ Workflow actions:`, actions);
+      console.log(`📧 Email sent: ${emailSent}`);
 
       return {
         success: true,
@@ -130,6 +157,7 @@ class WorkflowExecutor {
       };
 
     } catch (error) {
+      console.error(`❌ executeRFQWorkflow error:`, error);
       actions.push(`Error: ${error.message}`);
       return {
         success: false,
@@ -191,14 +219,17 @@ class WorkflowExecutor {
       // Send acknowledgment if automation allowed
       let emailSent = false;
       if (decision.automation_allowed) {
-        const sendResult = await emailSender.sendInvoiceAcknowledgment(
+        const sendResult = await emailSender.sendAIResponse(
           email.id,
           email.from_email,
-          email.subject
+          email.subject,
+          email.body,
+          analysis.email_type,
+          analysis.extracted_data
         );
 
         if (sendResult.success) {
-          actions.push(`Sent acknowledgment email to ${email.from_email}`);
+          actions.push(`Sent AI-generated acknowledgment email to ${email.from_email}`);
           emailSent = true;
         } else {
           actions.push(`Failed to send email: ${sendResult.error}`);
@@ -239,15 +270,18 @@ class WorkflowExecutor {
     try {
       // Check if this is a fallback case (AI failed)
       if (decision.status === 'Generic Response' && decision.automation_allowed) {
-        // Send generic acknowledgment
-        const sendResult = await emailSender.sendGenericAcknowledgment(
+        // Send AI-generated generic response
+        const sendResult = await emailSender.sendAIResponse(
           email.id,
           email.from_email,
-          email.subject
+          email.subject,
+          email.body,
+          analysis.email_type,
+          analysis.extracted_data
         );
 
         if (sendResult.success) {
-          actions.push(`Sent generic acknowledgment email to ${email.from_email}`);
+          actions.push(`Sent AI-generated acknowledgment email to ${email.from_email}`);
           actions.push('AI analysis failed - used fallback response');
           return {
             success: true,
@@ -255,7 +289,7 @@ class WorkflowExecutor {
             actions_taken: actions
           };
         } else {
-          actions.push(`Failed to send generic email: ${sendResult.error}`);
+          actions.push(`Failed to send AI email: ${sendResult.error}`);
           return {
             success: false,
             email_sent: false,

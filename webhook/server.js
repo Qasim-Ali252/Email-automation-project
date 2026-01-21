@@ -142,11 +142,11 @@ async function processEmail(email) {
       body: email.body || email.snippet || 'No body content available'
     };
     
-    console.log('📤 Forwarding to Vercel webhook...');
+    console.log('📤 Forwarding to local server...');
     console.log('📋 Data being sent:', JSON.stringify(webhookData, null, 2));
     
-    // Send to your Vercel endpoint
-    const response = await fetch('https://email-automation-project.vercel.app/api/emails/inbound', {
+    // Send to your local main server
+    const response = await fetch('http://localhost:3001/api/emails/inbound', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -157,7 +157,7 @@ async function processEmail(email) {
     const responseText = await response.text();
     
     if (response.ok) {
-      console.log('✅ Successfully forwarded to Vercel!');
+      console.log('✅ Successfully forwarded to local server!');
       console.log('📄 Vercel response:', responseText);
       
       // Try to parse response to get email_id
@@ -172,7 +172,7 @@ async function processEmail(email) {
       
       logToFile(email, 'SUCCESS');
     } else {
-      console.error('❌ Vercel webhook error:', response.status, response.statusText);
+      console.error('❌ Local server error:', response.status, response.statusText);
       console.error('📄 Error response:', responseText);
       logToFile(email, 'ERROR', `${response.status}: ${responseText}`);
     }
@@ -205,7 +205,7 @@ app.get('/', (req, res) => {
     <p>✅ Server is running!</p>
     <p>📤 Webhook URL: <code>POST /webhook</code></p>
     <p>🔗 Make sure your Apps Script points to: <code>http://YOUR_NGROK_URL/webhook</code></p>
-    <p>🚀 Forwards emails to: <code>https://email-automation-project.vercel.app/api/emails/inbound</code></p>
+    <p>🚀 Forwards emails to: <code>https://nonflirtatious-multispeed-arcelia.ngrok-free.dev/api/emails/inbound</code></p>
   `);
 });
 

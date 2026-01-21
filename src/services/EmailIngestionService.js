@@ -32,10 +32,9 @@ class EmailIngestionService {
       // Store email in database
       const email_id = await databaseService.insertEmail(sanitizedData);
 
-      console.log(`📧 Email received: ${email_id} from ${sanitizedData.from_email}`);
+      console.log(`📧 Construction email received: ${email_id} from ${sanitizedData.from_email}`);
 
-      // 🚀 CRITICAL: Return response immediately, then process async
-      // This prevents Vercel serverless timeout
+      // 🚀 Start AI analysis asynchronously
       setImmediate(() => {
         console.log(`🚀 Starting async AI analysis for email ${email_id}...`);
         aiAnalysisService.analyzeEmail(
@@ -50,7 +49,7 @@ class EmailIngestionService {
       return {
         success: true,
         email_id,
-        message: 'Email received and stored successfully'
+        message: 'Construction email received and stored successfully'
       };
 
     } catch (error) {
