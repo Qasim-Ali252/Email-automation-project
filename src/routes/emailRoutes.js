@@ -107,28 +107,16 @@ async function processEmailInBackground(payload) {
   console.log('🔄 Background processing started');
   
   try {
-    // Step 1: Sanitize and store email in database
+    // Use the EmailIngestionService to process the email properly
     console.log('💾 Storing email in database...');
-    const sanitizedData = {
-      from_email: emailIngestionService.sanitizeInput(payload.from_email),
-      subject: emailIngestionService.sanitizeInput(payload.subject),
-      body: emailIngestionService.sanitizeInput(payload.body)
-    };
-
-    const email_id = await databaseService.insertEmail(sanitizedData);
-    console.log(`✅ Email stored with ID: ${email_id}`);
-
-    // Step 2: Run AI analysis (with timeout protection)
-    console.log('🤖 Starting AI analysis...');
-    console.log('ABOUT TO CALL GROQ'); // Debug log as suggested
+    const result = await emailIngestionService.processIncomingEmail(payload);
     
-    await aiAnalysisService.analyzeEmail(
-      email_id,
-      sanitizedData.subject,
-      sanitizedData.body
-    );
+    if (result.success) {
+      console.log(`✅ Email processed successfully with ID: ${result.email_id}`);
+    } else {
+      console.error('❌ Email processing failed:', result.error);
+    }
     
-    console.log('GROQ FINISHED'); // Debug log as suggested
     console.log('✅ Background processing completed successfully');
 
   } catch (error) {

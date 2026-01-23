@@ -30,9 +30,19 @@ class AIAnalysisService {
    * Build structured prompt for email classification
    * @param {string} subject - Email subject
    * @param {string} body - Email body
+   * @param {boolean} hasAttachments - Whether email has attachments
+   * @param {Array} attachmentInfo - Array of attachment metadata
    * @returns {string} Formatted prompt
    */
-  buildPrompt(subject, body) {
+  buildPrompt(subject, body, hasAttachments = false, attachmentInfo = []) {
+    let attachmentText = '';
+    if (hasAttachments && attachmentInfo.length > 0) {
+      attachmentText = `\n\nAttachments (${attachmentInfo.length}):\n`;
+      attachmentInfo.forEach((attachment, index) => {
+        attachmentText += `${index + 1}. ${attachment.name} (${attachment.contentType}, ${attachment.size} bytes)\n`;
+      });
+    }
+
     return `You are an AI assistant analyzing construction-related emails.
 
 Classify the email into one of these types:
@@ -48,11 +58,13 @@ Extract the following information if present:
 - deadline: Any mentioned deadlines (in ISO date format if possible, or as mentioned)
 - urgency_level: Low, Medium, or High
 
+Consider attachments when classifying - documents like blueprints, contracts, or invoices can provide important context.
+
 Provide a confidence_score (0-1) indicating how confident you are in your classification.
 Provide reasoning explaining your classification decision.
 
 Email Subject: ${subject}
-Email Body: ${body}
+Email Body: ${body}${attachmentText}
 
 Respond ONLY with valid JSON in this exact format:
 {
@@ -141,16 +153,25 @@ Respond ONLY with valid JSON in this exact format:
    * @param {string} email_id - Email ID
    * @param {string} subject - Email subject
    * @param {string} body - Email body
+   * @param {boolean} hasAttachments - Whether email has attachments
+   * @param {Array} attachmentInfo - Array of attachment metadata
    * @returns {Promise<Object>} Analysis results
    */
-  async analyzeEmail(email_id, subject, body) {
+  async analyzeEmail(email_id, subject, body, hasAttachments = false, attachmentInfo = []) {
     console.log(`🤖 Starting AI analysis for email ${email_id}...`);
     console.log(`📋 Subject: ${subject}`);
     console.log(`📄 Body length: ${body.length} characters`);
     
+    if (hasAttachments && attachmentInfo.length > 0) {
+      console.log(`📎 Attachments: ${attachmentInfo.length} file(s)`);
+      attachmentInfo.forEach((attachment, index) => {
+        console.log(`  ${index + 1}. ${attachment.name} (${attachment.contentType})`);
+      });
+    }
+    
     try {
-      // Build prompt
-      const prompt = this.buildPrompt(subject, body);
+      // Build prompt with attachment info
+      const prompt = this.buildPrompt(subject, body, hasAttachments, attachmentInfo);
 
       console.log(`📤 Calling Groq API for email ${email_id} with model ${this.model}...`);
       const startTime = Date.now();

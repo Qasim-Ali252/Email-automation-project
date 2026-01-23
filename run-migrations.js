@@ -87,16 +87,29 @@ async function main() {
   
   console.log('✅ Database connection successful\n');
   
-  // Run migration
-  const success = await runMigration('database/migrations/001_create_tables.sql');
+  // Run migrations
+  const migrations = [
+    'database/migrations/001_create_tables.sql',
+    'database/migrations/002_add_attachment_fields.sql'
+  ];
+  
+  let allSuccess = true;
+  
+  for (const migration of migrations) {
+    const success = await runMigration(migration);
+    if (!success) {
+      allSuccess = false;
+    }
+  }
   
   console.log('=' .repeat(80));
   
-  if (success) {
+  if (allSuccess) {
     console.log('\n✅ All migrations completed successfully!\n');
   } else {
-    console.log('\n⚠️  Migration needs to be run manually in Supabase SQL Editor');
-    console.log('   File: database/migrations/001_create_tables.sql\n');
+    console.log('\n⚠️  Some migrations need to be run manually in Supabase SQL Editor');
+    console.log('   Files: database/migrations/001_create_tables.sql');
+    console.log('          database/migrations/002_add_attachment_fields.sql\n');
     process.exit(1);
   }
 }

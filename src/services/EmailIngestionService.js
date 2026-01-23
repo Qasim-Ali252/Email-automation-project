@@ -10,7 +10,13 @@ class EmailIngestionService {
    * Process incoming email
    */
   async processIncomingEmail(payload) {
-    console.log(payload, 'step 1')
+    console.log('📧 Raw payload received:', JSON.stringify(payload, null, 2));
+    console.log('🔍 Attachment fields check:');
+    console.log('  hasAttachments:', payload.hasAttachments);
+    console.log('  attachmentInfo:', payload.attachmentInfo);
+    console.log('  attachmentInfo type:', typeof payload.attachmentInfo);
+    console.log('  attachmentInfo length:', payload.attachmentInfo?.length);
+    
     try {
       // Validate payload
       const validation = this.validatePayload(payload);
@@ -22,17 +28,62 @@ class EmailIngestionService {
         };
       }
 
+      // 🚫 Filter out system-generated emails to prevent feedback loops
+      const systemEmails = [
+        'info@invextech.com',           // Your system's sending email
+        'noreply@invextech.com',        // No-reply emails
+        'automated@invextech.com',      // Automated responses
+        'system@invextech.com',         // System notifications
+        process.env.SMTP_FROM,          // Your configured SMTP sender
+        process.env.SMTP_USER           // Your SMTP user (fallback)
+      ].filter(Boolean); // Remove any undefined values
+
+      const fromEmail = payload.from_email.toLowerCase();
+      if (systemEmails.some(email => email && fromEmail.includes(email.toLowerCase()))) {
+        console.log(`🤖 Skipping system-generated email from: ${payload.from_email}`);
+        return {
+          success: true,
+          message: 'System-generated email skipped to prevent feedback loop',
+          skipped: true
+        };
+      }
+
+      // 🔄 Skip email chains that are getting too long (Re: Re: Re:...)
+      const reCount = (payload.subject.match(/Re:/g) || []).length;
+      if (reCount >= 3) {
+        console.log(`🔄 Skipping long email chain (${reCount} Re:s): ${payload.subject}`);
+        return {
+          success: true,
+          message: 'Long email chain skipped to prevent spam',
+          skipped: true
+        };
+      }
+
       // Sanitize inputs
       const sanitizedData = {
         from_email: this.sanitizeInput(payload.from_email),
         subject: this.sanitizeInput(payload.subject),
-        body: this.sanitizeInput(payload.body)
+        body: this.sanitizeInput(payload.body),
+        hasAttachments: Boolean(payload.hasAttachments),
+        attachmentInfo: payload.attachmentInfo || []
       };
+
+      console.log('🧹 Sanitized data:');
+      console.log('  hasAttachments:', sanitizedData.hasAttachments);
+      console.log('  attachmentInfo:', sanitizedData.attachmentInfo);
 
       // Store email in database
       const email_id = await databaseService.insertEmail(sanitizedData);
 
       console.log(`📧 Construction email received: ${email_id} from ${sanitizedData.from_email}`);
+      
+      // Log attachment info if present
+      if (sanitizedData.hasAttachments && sanitizedData.attachmentInfo.length > 0) {
+        console.log(`📎 Email has ${sanitizedData.attachmentInfo.length} attachment(s):`);
+        sanitizedData.attachmentInfo.forEach((attachment, index) => {
+          console.log(`  ${index + 1}. ${attachment.name} (${attachment.contentType}, ${attachment.size} bytes)`);
+        });
+      }
 
       // 🚀 Start AI analysis asynchronously
       setImmediate(() => {
@@ -40,7 +91,9 @@ class EmailIngestionService {
         aiAnalysisService.analyzeEmail(
           email_id,
           sanitizedData.subject,
-          sanitizedData.body
+          sanitizedData.body,
+          sanitizedData.hasAttachments,
+          sanitizedData.attachmentInfo
         ).catch(error => {
           console.error(`❌ Async AI analysis failed for email ${email_id}:`, error.message);
         });

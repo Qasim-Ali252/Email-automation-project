@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.WEBHOOK_PORT || 3000;
 
 // Enhanced middleware with better error handling
 app.use(express.json({
@@ -54,6 +54,14 @@ app.post('/webhook', (req, res) => {
   console.log('  Message ID:', email.messageId || 'N/A');
   console.log('  Has attachments:', email.hasAttachments || false);
   console.log('  Is test:', email.isTest || email.isManualTest || false);
+  
+  // Log attachment details if present
+  if (email.hasAttachments && email.attachmentInfo) {
+    console.log('📎 Attachments:');
+    email.attachmentInfo.forEach((attachment, index) => {
+      console.log(`    ${index + 1}. ${attachment.name} (${attachment.contentType}, ${attachment.size} bytes)`);
+    });
+  }
   
   if (email.snippet) {
     console.log('  Snippet:', email.snippet.substring(0, 100) + '...');
@@ -139,7 +147,9 @@ async function processEmail(email) {
     const webhookData = {
       from_email: extractEmail(fromField),
       subject: email.subject,
-      body: email.body || email.snippet || 'No body content available'
+      body: email.body || email.snippet || 'No body content available',
+      hasAttachments: email.hasAttachments || false,
+      attachmentInfo: email.attachmentInfo || []
     };
     
     console.log('📤 Forwarding to local server...');

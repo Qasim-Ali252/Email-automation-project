@@ -55,9 +55,11 @@ class DatabaseService {
    * @param {string} emailData.from_email - Sender email address
    * @param {string} emailData.subject - Email subject
    * @param {string} emailData.body - Email body
+   * @param {boolean} emailData.hasAttachments - Whether email has attachments
+   * @param {Array} emailData.attachmentInfo - Array of attachment metadata
    * @returns {Promise<string>} Created email ID
    */
-  async insertEmail({ from_email, subject, body }) {
+  async insertEmail({ from_email, subject, body, hasAttachments = false, attachmentInfo = [] }) {
     return this.retryOperation(async () => {
       const { data, error } = await this.client
         .from('emails')
@@ -65,6 +67,8 @@ class DatabaseService {
           from_email,
           subject,
           body,
+          has_attachments: hasAttachments,
+          attachment_info: attachmentInfo,
           status: 'Received',
           received_at: new Date().toISOString()
         })
